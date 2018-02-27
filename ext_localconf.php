@@ -33,3 +33,6 @@ $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['scheduler']['tasks']['Localizationman
   'description' => 'LLL:EXT:' . $_EXTKEY . 'Resources/Private/Language/Task/locallang.xml:fileGarbageCollection.description',
   'additionalFields' => 'LocalizationmanagerFileGarbageCollectionAdditionalFieldProvider',
 );
+
+$GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['l10nmgr']['savePreProcess']['remapMissingUids'] =
+    \Localizationteam\L10nmgr\Hooks\TranslationProcessor::class;
