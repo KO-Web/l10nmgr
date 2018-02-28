@@ -73,10 +73,11 @@ class TranslationProcessor
 
         $targetLanguage = $translationData->getLanguage();
         $inputArray = $translationData->getTranslationData();
-
         $automaticUnHide = (bool)$this->getExtensionConfiguration('l10nmgr', 'enable_neverHideAtCopy');
+        $preTranslateMissingReferences = true;
 
-        $remappedInputArray = $this->remapNonMatchingIds($inputArray, $targetLanguage, true, $automaticUnHide);
+        $remappedInputArray =
+            $this->remapNonMatchingIds($inputArray, $targetLanguage, $preTranslateMissingReferences, $automaticUnHide);
 
         $translationData->setTranslationData($remappedInputArray);
     }
@@ -129,6 +130,7 @@ class TranslationProcessor
         $remappedInputArray = [];
         $preTranslateCommands = [];
         $helperArray = [];
+        $targetLanguage = (int)$targetLanguage;
 
         // For each table with elements to be translated.
         foreach ($translationData as $table => $elementsInTable) {
@@ -138,6 +140,7 @@ class TranslationProcessor
                 foreach ($fields as $fieldKey => $translatedValue) {
                     // Check if the translated record is the right translated record.
                     list($Ttable, $TuidString, $Tfield, $Tpath) = explode(':', $fieldKey);
+                    list($Tuid, $Tlang, $TdefRecord) = explode('/', $TuidString);
 
                     if (MathUtility::canBeInterpretedAsInteger($TuidString) && intval($TuidString) > 0) {
                         $translatedRecordUid = $this->getLocalizedUid($Ttable, $elementUid, $targetLanguage);
@@ -201,6 +204,43 @@ class TranslationProcessor
                                     $helperArray[$table][$elementUid][$fieldKey] = true;
                                 }
                             }
+                        }
+                    } elseif ($preTranslateMissingReferences && $Tuid === 'NEW' && $table === 'sys_file_reference') {
+                        /*
+                         * Pre-translate file references when importing records targeted as NEW if the parent record
+                         * translation is present. This avoids these file references being overlooked.
+                         */
+                        $translatedRecordUid = $this->getLocalizedUid($Ttable, $elementUid, $targetLanguage);
+                        $referenceRecord = $this->getReferenceRecord($elementUid);
+
+                        if (!is_null($referenceRecord) && $translatedRecordUid === 0) {
+                            $parentTable = $referenceRecord['tablenames'];
+                            $parentUid = $referenceRecord['uid_foreign'];
+
+                            $translatedParentUid = $this->getLocalizedUid(
+                                $parentTable,
+                                $parentUid,
+                                $targetLanguage
+                            );
+
+                            if ($translatedParentUid > 0) {
+                                /*
+                                 * Only the translated file reference is missing, pre-translate it by using
+                                 * field synchronization.
+                                 */
+                                $preTranslateCommands[$parentTable][$parentUid]['inlineLocalizeSynchronize'] = [
+                                    'field' => $referenceRecord['fieldname'],
+                                    'language' => $targetLanguage,
+                                    'action' => 'synchronize',
+                                ];
+
+                                $helperArray[$table][$elementUid][$fieldKey] = true;
+                            }
+
+                            /*
+                             * Translating the parent doesn't seem to be necessary in this case, because it will be
+                             * translated anyways at some other phase.
+                             */
                         }
                     }
 
