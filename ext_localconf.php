@@ -36,3 +36,6 @@ $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['scheduler']['tasks']['Localizationman
 
 $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['l10nmgr']['savePreProcess']['remapMissingUids'] =
     \Localizationteam\L10nmgr\Hooks\TranslationProcessor::class;
+
+$GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['l10nmgr']['savePostProcess']['syncronizeGridelementChildren'] =
+    \Localizationteam\L10nmgr\Hooks\TranslationProcessor::class;

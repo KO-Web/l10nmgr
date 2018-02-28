@@ -30,6 +30,7 @@ use Localizationteam\L10nmgr\Model\L10nConfiguration;
 use Localizationteam\L10nmgr\Model\TranslationData;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
+use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
 use TYPO3\CMS\Extbase\Object\ObjectManager;
@@ -81,6 +82,37 @@ class TranslationProcessor
     }
 
     /**
+     * Synchronize Gridlement children
+     *
+     * @param \Localizationteam\L10nmgr\Model\L10nConfiguration $configurationObject
+     * @param \Localizationteam\L10nmgr\Model\TranslationData $translationData
+     * @param array $flexFormDiff
+     * @param \Localizationteam\L10nmgr\Model\L10nBaseService $l10nBaseService
+     *
+     * @return void
+     */
+    public function processAfterSaving(
+        L10nConfiguration $configurationObject,
+        TranslationData $translationData,
+        array $flexFormDiff,
+        L10nBaseService $l10nBaseService
+    ) {
+        // Return if gridelements is not active
+        if ($l10nBaseService->getImportAsDefaultLanguage()
+            || !ExtensionManagementUtility::isLoaded('gridelements')
+        ) {
+            return;
+        }
+
+        $targetLanguage = $translationData->getLanguage();
+        $inputArray = $translationData->getTranslationData();
+
+        $automaticUnHide = (bool)$this->getExtensionConfiguration('l10nmgr', 'enable_neverHideAtCopy');
+
+        $this->synchronizeGridElementChildren($inputArray, $targetLanguage, $automaticUnHide);
+    }
+
+    /**
      * @param array $translationData
      * @param int $targetLanguage
      * @param bool $preTranslateMissingReferences
@@ -120,7 +152,7 @@ class TranslationProcessor
                             if ($Tpath) {
                                 $fieldKey .= ':' . $Tpath;
                             }
-                        } else {
+                        } elseif ($translatedRecordUid === 0) {
                             // Record doesn't exist, let it be created again by using "NEW/lang/origUid" notation.
                             $translatedRecordUid = 'NEW/' . $targetLanguage . '/' . $elementUid;
                             $fieldKey = $Ttable . ':' . $translatedRecordUid . ':' . $Tfield;
@@ -283,7 +315,7 @@ class TranslationProcessor
             $beUser = $this->getBackendUser();
 
             if (!is_null($beUser)) {
-                $beUser->writelog(4, 0, 2, 1519749045, '[l10nmgr_ext] TCEmain localization errors', $dataHandler->errorLog);
+                $beUser->writelog(4, 0, 2, 0, '[l10nmgr_ext] TCEmain localization errors', $dataHandler->errorLog);
             }
         }
 
@@ -317,5 +349,88 @@ class TranslationProcessor
         $extensionConfiguration = $this->configurationUtility->getCurrentConfiguration($extKey);
 
         return $extensionConfiguration[$parameterName]['value'] ?: null;
+    }
+
+    /**
+     * @param array $translationData
+     * @param int $targetLanguage
+     * @param bool $automaticUnHide
+     *
+     * @return void
+     */
+    protected function synchronizeGridElementChildren($translationData, $targetLanguage, $automaticUnHide)
+    {
+        $relocateDataMap = [];
+
+        foreach ($translationData as $table => $elementsInTable) {
+            // Search only among just translated content elements.
+            if ($table === 'tt_content') {
+                // For each translated content element.
+                foreach ($elementsInTable as $elementUid => $fields) {
+                    // Determine if the current element is contained by a gridelement.
+                    $element = BackendUtility::getRecordWSOL('tt_content', $elementUid, 'tx_gridelements_container');
+                    $elementInsideGridelement = !is_null($element) && ($element['tx_gridelements_container'] > 0);
+
+                    if ($elementInsideGridelement) {
+                        // Fetch the newly translated record
+                        $translatedElement =
+                            BackendUtility::getRecordLocalization('tt_content', $elementUid, $targetLanguage);
+
+                        if (!empty($translatedElement)) {
+                            // Fetch the container of the translated record
+                            $containerElement = BackendUtility::getRecord(
+                                'tt_content',
+                                $translatedElement[0]['tx_gridelements_container'],
+                                'uid, sys_language_uid'
+                            );
+
+                            // If the record is contained by a gridelement of another language, then relocate it
+                            if (!is_null($containerElement)
+                                && (int)$containerElement['sys_language_uid'] !== (int)$targetLanguage
+                            ) {
+                                // Relocate element to be contained by the translated parent (localized)
+                                $translatedContainerUid =
+                                    $this->getLocalizedUid('tt_content', $containerElement['uid'], $targetLanguage);
+
+                                if ($translatedContainerUid > 0) {
+                                    // Append relocation to data map for the DataHandler
+                                    $relocateDataMap['tt_content'][$translatedElement[0]['uid']]['tx_gridelements_container'] =
+                                        $translatedContainerUid;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!empty($relocateDataMap)) {
+            // If changes are
+            $this->executeDataMap($relocateDataMap, $automaticUnHide);
+        }
+    }
+
+    /**
+     * @param array $dataMap
+     * @param bool $automaticUnHide
+     *
+     * @return void
+     */
+    protected function executeDataMap($dataMap, $automaticUnHide = false)
+    {
+        /** @var \TYPO3\CMS\Core\DataHandling\DataHandler $dataHandler */
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+
+        $dataHandler->neverHideAtCopy = boolval($automaticUnHide);
+        $dataHandler->start($dataMap, []);
+        $dataHandler->process_datamap();
+
+        if (count($dataHandler->errorLog)) {
+            $beUser = $this->getBackendUser();
+
+            if (!is_null($beUser)) {
+                $beUser->writelog(4, 0, 2, 0, '[l10nmgr_ext] Gridelment sync errors', $dataHandler->errorLog);
+            }
+        }
     }
 }
