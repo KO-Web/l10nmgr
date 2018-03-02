@@ -34,7 +34,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  */
 class L10nBaseService
 {
-    
+
     protected static $targetLanguageID = null;
     /**
      * @var bool Translate even if empty.
@@ -60,13 +60,13 @@ class L10nBaseService
      * @var int
      */
     protected $depthCounter = 0;
-    
+
     public function __construct()
     {
         // Load the extension's configuration
         $this->extensionConfiguration = unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf']['l10nmgr']);
     }
-    
+
     /**
      * @return integer|NULL
      */
@@ -74,7 +74,7 @@ class L10nBaseService
     {
         return self::$targetLanguageID;
     }
-    
+
     /**
      * Save the translation
      *
@@ -100,14 +100,14 @@ class L10nBaseService
         $previewLanguage = $translationObj->getPreviewLanguage();
         $accumObj = $l10ncfgObj->getL10nAccumulatedInformationsObjectForLanguage($sysLang);
         $accumObj->setForcedPreviewLanguage($previewLanguage);
-        
+
         $flexFormDiffArray = $this->_submitContentAndGetFlexFormDiff($accumObj->getInfoArray($sysLang),
             $translationObj->getTranslationData());
-        
+
         if ($flexFormDiffArray !== false) {
             $l10ncfgObj->updateFlexFormDiff($sysLang, $flexFormDiffArray);
         }
-        
+
         // Provide a hook for specific manipulations after saving
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['l10nmgr']['savePostProcess'])) {
             foreach ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['l10nmgr']['savePostProcess'] as $classReference) {
@@ -116,7 +116,7 @@ class L10nBaseService
             }
         }
     }
-    
+
     /**
      * Submit incoming content to database. Must match what is available in $accum.
      *
@@ -133,7 +133,7 @@ class L10nBaseService
             return $this->_submitContentAsTranslatedLanguageAndGetFlexFormDiff($accum, $inputArray);
         }
     }
-    
+
     /**
      * Getter for $importAsDefaultLanguage
      *
@@ -143,7 +143,7 @@ class L10nBaseService
     {
         return $this->importAsDefaultLanguage;
     }
-    
+
     /**
      * Setter for $importAsDefaultLanguage
      *
@@ -155,7 +155,7 @@ class L10nBaseService
     {
         $this->importAsDefaultLanguage = $importAsDefaultLanguage;
     }
-    
+
     /**
      * Submit incoming content as default language to database. Must match what is available in $accum.
      *
@@ -171,7 +171,7 @@ class L10nBaseService
             /** @var $flexToolObj FlexFormTools */
             $flexToolObj = GeneralUtility::makeInstance(FlexFormTools::class);
             $TCEmain_data = array();
-            
+
             $_flexFormDiffArray = array();
             // Traverse:
             foreach ($accum as $pId => $page) {
@@ -187,14 +187,14 @@ class L10nBaseService
                             }
                         }
                         if (is_array($data['fields'])) {
-                            
+
                             foreach ($data['fields'] as $key => $tData) {
-                                
+
                                 if (is_array($tData) && isset($inputArray[$table][$elementUid][$key])) {
-                                    
+
                                     list($Ttable, $TuidString, $Tfield, $Tpath) = explode(':', $key);
                                     list($Tuid, $Tlang, $TdefRecord) = explode('/', $TuidString);
-                                    
+
                                     if (!$this->createTranslationAlsoIfEmpty && $inputArray[$table][$elementUid][$key] == '' && $Tuid == 'NEW') {
                                         //if data is empty do not save it
                                         unset($inputArray[$table][$elementUid][$key]);
@@ -241,13 +241,13 @@ class L10nBaseService
                     }
                 }
             }
-            
+
             if ($TCEmain_data['pages_language_overlay']) {
                 $TCEmain_data['pages'] = $TCEmain_data['pages_language_overlay'];
                 unset($TCEmain_data['pages_language_overlay']);
             }
             $this->lastTCEMAINCommandsCount = 0;
-            
+
             // Now, submitting translation data:
             $tce = GeneralUtility::makeInstance(DataHandler::class);
             $tce->stripslashes_values = false;
@@ -263,9 +263,9 @@ class L10nBaseService
                 GeneralUtility::sysLog(__FILE__ . ': ' . __LINE__ . ': TCEmain update errors: ' . GeneralUtility::arrayToLogString($tce->errorLog),
                     'l10nmgr');
             }
-            
+
             if (count($tce->autoVersionIdMap) && count($_flexFormDiffArray)) {
-                
+
                 foreach ($_flexFormDiffArray as $key => $value) {
                     list($Ttable, $Tuid, $Trest) = explode(':', $key, 3);
                     if ($tce->autoVersionIdMap[$Ttable][$Tuid]) {
@@ -274,18 +274,18 @@ class L10nBaseService
                     }
                 }
             }
-            
+
             // Should be empty now - or there were more information in the incoming array than there should be!
             if (count($inputArray)) {
                 debug($inputArray, 'These fields were ignored since they were not in the configuration:');
             }
-            
+
             return $_flexFormDiffArray;
         } else {
             return false;
         }
     }
-    
+
     /**
      * Submit incoming content as translated language to database. Must match what is available in $accum.
      *
@@ -305,7 +305,7 @@ class L10nBaseService
             $fluxInstalled = ExtensionManagementUtility::isLoaded('flux');
             $TCEmain_data = array();
             $this->TCEmain_cmd = array();
-            
+
             $_flexFormDiffArray = array();
             // Traverse:
             foreach ($accum as $pId => $page) {
@@ -322,18 +322,18 @@ class L10nBaseService
                         }
                         if (is_array($data['fields'])) {
                             foreach ($data['fields'] as $key => $tData) {
-                                
+
                                 if (is_array($tData) && isset($inputArray[$table][$elementUid][$key])) {
-                                    
+
                                     list($Ttable, $TuidString, $Tfield, $Tpath) = explode(':', $key);
                                     list($Tuid, $Tlang, $TdefRecord) = explode('/', $TuidString);
-                                    
+
                                     if (!$this->createTranslationAlsoIfEmpty && $inputArray[$table][$elementUid][$key] == '' && $Tuid == 'NEW') {
                                         //if data is empty do not save it
                                         unset($inputArray[$table][$elementUid][$key]);
                                         continue;
                                     }
-                                    
+
                                     // If new element is required, we prepare for localization
                                     if ($Tuid === 'NEW') {
                                         if ($table === 'tt_content' && ($gridElementsInstalled === true || $fluxInstalled === true)) {
@@ -396,7 +396,7 @@ class L10nBaseService
                                             }
                                         }
                                     }
-                                    
+
                                     // If FlexForm, we set value in special way:
                                     if ($Tpath) {
                                         if (!is_array($TCEmain_data[$Ttable][$TuidString][$Tfield])) {
@@ -439,9 +439,9 @@ class L10nBaseService
                     }
                 }
             }
-            
+
             self::$targetLanguageID = $Tlang;
-            
+
             // Execute CMD array: Localizing records:
             /** @var $tce DataHandler */
             $tce = GeneralUtility::makeInstance(DataHandler::class);
@@ -457,45 +457,84 @@ class L10nBaseService
                     debug($tce->errorLog, 'TCEmain localization errors:');
                 }
             }
-            
+
             // Before remapping
             if (TYPO3_DLOG) {
                 GeneralUtility::sysLog(__FILE__ . ': ' . __LINE__ . ': TCEmain_data before remapping: ' . GeneralUtility::arrayToLogString($TCEmain_data),
                     'l10nmgr');
             }
-            // Remapping those elements which are new:
-            $this->lastTCEMAINCommandsCount = 0;
+
+            // Remapping those elements which are new: (take special care of sys_file_reference elements)
+            // When translating sys_file_reference records, they don't get the proper language or localization parent.
+            $lastTCEMAINCommandsCount = 0;
+
             foreach ($TCEmain_data as $table => $items) {
                 foreach ($TCEmain_data[$table] as $TuidString => $fields) {
+                    // Get translated record identifiers
+                    list($Tuid, $Tlang, $TdefRecord) = explode('/', $TuidString);
+
+                    // Increase count of DataHandler data instructions
+                    $lastTCEMAINCommandsCount++;
+
                     if ($table === 'sys_file_reference' && $fields['tablenames'] === 'pages') {
-                        $parent = BackendUtility::getRecordRaw('pages_language_overlay',
-                            'pid = ' . (int)$element['uid_foreign'] . '
-			                AND deleted = 0 AND sys_language_uid = ' . (int)$Tlang);
+                        $overlayTableName = $fields['tablenames'];
+                        if ($overlayTableName === 'pages') {
+                            $overlayTableName = 'pages_language_overlay';
+                        }
+
+                        $parent = BackendUtility::getRecordRaw(
+                            $overlayTableName,
+                            'pid = ' . (int)$element['uid_foreign'] // $element ist almost unpredictable
+                                . ' AND deleted = 0 AND sys_language_uid = ' . (int)$Tlang
+                        );
+
                         if ($parent['uid']) {
-                            $fields['tablenames'] = 'pages_language_overlay';
                             $fields['uid_foreign'] = $parent['uid'];
+
+                            // Force target language to be set on translated record
+                            $languageField = $TCA['sys_file_reference']['ctrl']['languageField'];
+                            $fields[$languageField] = $Tlang;
+
+                            if ($fields['tablenames'] === 'pages') {
+                                $fields['tablenames'] = $overlayTableName;
+                            }
                         }
                     }
-                    list($Tuid, $Tlang, $TdefRecord) = explode('/', $TuidString);
-                    $this->lastTCEMAINCommandsCount++;
+
                     if ($Tuid === 'NEW') {
                         if ($tce->copyMappingArray_merged[$table][$TdefRecord]) {
-                            $TCEmain_data[$table][BackendUtility::wsMapId($table,
-                                $tce->copyMappingArray_merged[$table][$TdefRecord])] = $fields;
+                            $workspaceMappedUid = BackendUtility::wsMapId(
+                                $table,
+                                $tce->copyMappingArray_merged[$table][$TdefRecord]
+                            );
+                            $TCEmain_data[$table][$workspaceMappedUid] = $fields;
+                        } elseif ($table === 'sys_file_reference'
+                            && ($localizationUid = $this->checkForExistingFileReferenceLocalization($TdefRecord, $Tlang))
+                        ) {
+                            // @todo Handle loose translated sys_file_reference records
+                            $workspaceMappedUid = BackendUtility::wsMapId($table, $localizationUid);
+                            $TCEmain_data[$table][$workspaceMappedUid] = $fields;
                         } else {
-                            GeneralUtility::sysLog(__FILE__ . ': ' . __LINE__ . ': Record "' . $table . ':' . $TdefRecord . '" was NOT localized as it should have been!',
-                                'l10nmgr');
+                            GeneralUtility::sysLog(
+                                __FILE__ . ': ' . __LINE__ . ': Record "' . $table . ':'
+                                    . $TdefRecord . '" was NOT localized as it should have been!',
+                                'l10nmgr'
+                            );
                         }
+
                         unset($TCEmain_data[$table][$TuidString]);
                     }
                 }
             }
+
+            $this->lastTCEMAINCommandsCount = $lastTCEMAINCommandsCount;
+
             // After remapping
             if (TYPO3_DLOG) {
                 GeneralUtility::sysLog(__FILE__ . ': ' . __LINE__ . ': TCEmain_data after remapping: ' . GeneralUtility::arrayToLogString($TCEmain_data),
                     'l10nmgr');
             }
-            
+
             // Now, submitting translation data:
             /** @var $tce DataHandler */
             $tce = GeneralUtility::makeInstance(DataHandler::class);
@@ -512,12 +551,12 @@ class L10nBaseService
             }
 
             self::$targetLanguageID = null;
-            
+
             if (count($tce->errorLog)) {
                 GeneralUtility::sysLog(__FILE__ . ': ' . __LINE__ . ': TCEmain update errors: ' . GeneralUtility::arrayToLogString($tce->errorLog),
                     'l10nmgr');
             }
-            
+
             if (count($tce->autoVersionIdMap) && count($_flexFormDiffArray)) {
                 if (TYPO3_DLOG) {
                     GeneralUtility::sysLog(__FILE__ . ': ' . __LINE__ . ': flexFormDiffArry: ' . GeneralUtility::arrayToLogString($this->flexFormDiffArray),
@@ -537,18 +576,18 @@ class L10nBaseService
                         'l10nmgr');
                 }
             }
-            
+
             // Should be empty now - or there were more information in the incoming array than there should be!
             if (count($inputArray)) {
                 debug($inputArray, 'These fields were ignored since they were not in the configuration:');
             }
-            
+
             return $_flexFormDiffArray;
         } else {
             return false;
         }
     }
-    
+
     /**
      * @param $element
      * @param $Tlang
@@ -735,6 +774,7 @@ class L10nBaseService
      */
     protected function getDataHandlerInstance()
     {
+        /** @var DataHandler $dataHandler */
         $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
         if ($this->extensionConfiguration['enable_neverHideAtCopy'] == 1) {
             $dataHandler->neverHideAtCopy = true;
@@ -743,5 +783,59 @@ class L10nBaseService
         $dataHandler->dontProcessTransformations = true;
         $dataHandler->isImporting = true;
         return $dataHandler;
+    }
+
+    /**
+     * @param int $originalRecordUid
+     * @param int $targetSysLanguageUid
+     * @return int
+     */
+    protected function checkForExistingFileReferenceLocalization($originalRecordUid, $targetSysLanguageUid)
+    {
+        // Search for translated record through the parent record
+
+        // Try to get the localized record by normal means first
+        $translatedRecord = BackendUtility::getRecordLocalization(
+            'sys_file_reference',
+            $originalRecordUid,
+            $targetSysLanguageUid
+        );
+
+        if ($translatedRecord !== false && intval($translatedRecord['uid']) > 0) {
+            return (int)$translatedRecord['uid'];
+        }
+
+        $originalRecord = BackendUtility::getRecord(
+            'sys_file_reference',
+            $originalRecordUid,
+            'uid_foreign, tablenames'
+        );
+
+        if ($originalRecord === false) {
+            return false;
+        }
+
+        // @todo split tablenames and use foreach (one parent should suffice to find the localized record)
+        $nonTraslatedParentRecord = BackendUtility::getRecord(
+            $originalRecord['tablenames'],
+            $originalRecord['uid_foreign'],
+            'uid'
+        );
+
+        if ($nonTraslatedParentRecord === false || intval($nonTraslatedParentRecord['uid']) <= 0) {
+            return false;
+        }
+
+        $translatedParentRecord = BackendUtility::getRecordLocalization(
+            $originalRecord['tablenames'],
+            $nonTraslatedParentRecord['uid'],
+            $targetSysLanguageUid
+        );
+
+        if ($nonTraslatedParentRecord === false || intval($nonTraslatedParentRecord['uid']) <= 0) {
+            return false;
+        }
+
+        return 0;
     }
 }
