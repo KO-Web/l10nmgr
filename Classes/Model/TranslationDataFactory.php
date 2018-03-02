@@ -114,21 +114,12 @@ class TranslationDataFactory
                                     'l10nmgr'
                                 );
                             }
-                            $pattern2 = '/' . preg_replace('/\//i', '\/', preg_quote($pattern)) . '/';
-                            $pattern = '/^' . preg_replace('/\//i', '\/', preg_quote($pattern)) . '/';
                             $originalValue = htmlspecialchars($row['XMLvalue'], ENT_COMPAT | ENT_IGNORE | ENT_XHTML,
                                 'UTF-8', false);
-                            if (TYPO3_DLOG) {
-                                GeneralUtility::sysLog(
-                                    __FILE__ . ': ' . __LINE__ . ': Pattern: ' . $pattern,
-                                    'l10nmgr'
-                                );
-                                GeneralUtility::sysLog(
-                                    __FILE__ . ': ' . __LINE__ . ': Pattern 2: ' . $pattern2,
-                                    'l10nmgr'
-                                );
-                            }
-                            if (preg_match($pattern, $originalValue, $treffer)) {
+
+                            // If $originalValue starts with $pattern
+                            if (strpos($originalValue, $pattern) === 0) {
+                            // if (preg_match($pattern1, $originalValue, $treffer)) {
                                 if (TYPO3_DLOG) {
                                     GeneralUtility::sysLog(
                                         __FILE__ . ': ' . __LINE__ . ': Start row[values][0] eq start row[XMLvalue]!!!'
@@ -137,8 +128,10 @@ class TranslationDataFactory
                                     );
                                 }
                                 $translation[$attrs['table']][$attrs['elementUid']][$attrs['key']] = $row['XMLvalue'];
-                            } elseif ((preg_match('/<[^>]+>/i', $originalValue)) && (!preg_match($pattern2,
-                                    $originalValue, $treffer))
+                            } elseif (preg_match('/<[^>]+>/i', $originalValue)
+                                // ...and $originalValue doesn't contain $pattern
+                                && strpos($originalValue, $pattern) === false
+                                // && !preg_match($pattern2, $originalValue, $treffer)
                             ) {
                                 if (TYPO3_DLOG) {
                                     GeneralUtility::sysLog(
