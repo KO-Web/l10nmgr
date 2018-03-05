@@ -118,7 +118,7 @@ class TranslationDataFactory
                                 'UTF-8', false);
 
                             // If $originalValue starts with $pattern
-                            if (strpos($originalValue, $pattern) === 0) {
+                            if (strlen($pattern) > 0 && strpos($originalValue, $pattern) === 0) {
                             // if (preg_match($pattern1, $originalValue, $treffer)) {
                                 if (TYPO3_DLOG) {
                                     GeneralUtility::sysLog(
@@ -130,7 +130,7 @@ class TranslationDataFactory
                                 $translation[$attrs['table']][$attrs['elementUid']][$attrs['key']] = $row['XMLvalue'];
                             } elseif (preg_match('/<[^>]+>/i', $originalValue)
                                 // ...and $originalValue doesn't contain $pattern
-                                && strpos($originalValue, $pattern) === false
+                                && strlen($pattern) > 0 && strpos($originalValue, $pattern) === false
                                 // && !preg_match($pattern2, $originalValue, $treffer)
                             ) {
                                 if (TYPO3_DLOG) {
