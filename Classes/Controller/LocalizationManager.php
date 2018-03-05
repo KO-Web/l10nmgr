@@ -666,6 +666,8 @@ return false;
                 if ($importManager->parseAndCheckXMLFile() === false) {
                     $actionInfo .= '<br/><br/>' . $this->moduleTemplate->header($this->getLanguageService()->getLL('import.error.title')) . $importManager->getErrorMessages();
                 } else {
+                    $pageIds = $importManager->getPidsFromCATXMLNodes($importManager->getXmlNodes());
+
                     if (GeneralUtility::_POST('import_delL10N') == '1') {
                         $actionInfo .= $this->getLanguageService()->getLL('import.xml.delL10N.message') . '<br/>';
                         $delCount = $importManager->delL10N($importManager->getDelL10NDataFromCATXMLNodes($importManager->getXMLNodes()));
@@ -673,7 +675,6 @@ return false;
                                 $delCount) . '<br/><br/>';
                     }
                     if (GeneralUtility::_POST('make_preview_link') == '1') {
-                        $pageIds = $importManager->getPidsFromCATXMLNodes($importManager->getXmlNodes());
                         $actionInfo .= '<b>' . $this->getLanguageService()->getLL('import.xml.preview_links.title') . '</b><br/>';
                         /** @var MkPreviewLinkService $mkPreviewLinks */
                         $mkPreviewLinks = GeneralUtility::makeInstance(MkPreviewLinkService::class,
@@ -684,13 +685,47 @@ return false;
                     if ($importManager->headerData['t3_sourceLang'] === $importManager->headerData['t3_targetLang']) {
                         $this->previewLanguage = $this->sysLanguage;
                     }
-                    $translationData = $factory->getTranslationDataFromCATXMLNodes($importManager->getXMLNodes());
-                    $translationData->setLanguage($this->sysLanguage);
-                    $translationData->setPreviewLanguage($this->previewLanguage);
-                    //$actionInfo.="<pre>".var_export($GLOBALS['BE_USER'],true)."</pre>";
-                    unset($importManager);
-                    $service->saveTranslation($l10ncfgObj, $translationData);
-                    $actionInfo .= '<br/>' . $this->moduleTemplate->icons(-1) . $this->getLanguageService()->getLL('import.xml.done.message') . '<br/><br/>(Command count:' . $service->lastTCEMAINCommandsCount . ')';
+
+                    // @todo use extension configuration to decide if the import is to be done page by page.
+                    if ((bool)$this->lConf['importPageByPage'] && !empty($pageIds)) {
+                        $dataHandlerCommandsCount = 0;
+
+                        foreach ($pageIds as $pageId) {
+                            $pageId = (int)$pageId;
+
+                            if ($pageId <= 0) {
+                                continue;
+                            }
+
+                            /** @var \Localizationteam\L10nmgr\Model\TranslationData $translationData */
+                            $translationData = $factory->getTranslationDataFromCATXMLNodes(
+                                $importManager->getXMLNodes(),
+                                $pageId
+                            );
+                            $translationData->setLanguage($this->sysLanguage);
+                            $translationData->setPreviewLanguage($this->previewLanguage);
+
+                            $service->saveTranslation($l10ncfgObj, $translationData);
+
+                            $dataHandlerCommandsCount += $service->lastTCEMAINCommandsCount;
+                        }
+
+                        $actionInfo .= '<br/>' . $this->moduleTemplate->icons(-1)
+                            . $this->getLanguageService()->getLL('import.xml.done.message')
+                            . '<br/><br/>(Command count:' . $dataHandlerCommandsCount . ')';
+                    } else {
+                        $translationData = $factory->getTranslationDataFromCATXMLNodes($importManager->getXMLNodes());
+                        $translationData->setLanguage($this->sysLanguage);
+                        $translationData->setPreviewLanguage($this->previewLanguage);
+
+                        // Not needed anymore, unset variable to save memory.
+                        unset($importManager);
+                        $service->saveTranslation($l10ncfgObj, $translationData);
+
+                        $actionInfo .= '<br/>' . $this->moduleTemplate->icons(-1)
+                            . $this->getLanguageService()->getLL('import.xml.done.message')
+                            . '<br/><br/>(Command count:' . $service->lastTCEMAINCommandsCount . ')';
+                    }
                 }
             }
             GeneralUtility::unlink_tempfile($uploadedTempFile);
