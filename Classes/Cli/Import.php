@@ -471,12 +471,37 @@ class Import extends CommandLineController
                                 $this->callParameters['server']);
                             $out .= $previewLink;
                         }
-                        /** @var $translationData TranslationData */
-                        $translationData = $factory->getTranslationDataFromCATXMLNodes($importManager->getXMLNodes());
-                        $translationData->setLanguage($this->sysLanguage);
-                        $translationData->setPreviewLanguage($this->previewLanguage);
-                        unset($importManager);
-                        $service->saveTranslation($l10ncfgObj, $translationData);
+
+                        $pageIds = $importManager->getPidsFromCATXMLNodes($importManager->getXmlNodes());
+
+                        if (!empty($pageIds)) {
+                            $out .= LF;
+                        }
+
+                        foreach ($pageIds as $pageId) {
+                            $pageId = (int)$pageId;
+
+                            if ($pageId <= 0) {
+                                continue;
+                            }
+
+                            /** @var \Localizationteam\L10nmgr\Model\TranslationData $translationData */
+                            $translationData = $factory->getTranslationDataFromCATXMLNodes(
+                                $importManager->getXMLNodes(),
+                                $pageId
+                            );
+                            $translationData->setLanguage($this->sysLanguage);
+                            $translationData->setPreviewLanguage($this->previewLanguage);
+
+                            $service->saveTranslation($l10ncfgObj, $translationData);
+
+                            $out .= LF . 'Page ' . $pageId . ' successfully imported.';
+                        }
+
+                        if (!empty($pageIds)) {
+                            $out .= LF;
+                        }
+
                         // Store some information about the imported file
                         // This is used later for reporting by mail
                         $this->filesImported[$xmlFile] = array(

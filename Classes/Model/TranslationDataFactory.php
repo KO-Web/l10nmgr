@@ -40,15 +40,17 @@ class TranslationDataFactory
 
     /**
      * public Factory method to get initialised tranlationData Object from the passed XMLNodes Array
-     * see tx_l10nmgr_CATXMLImportManager
+     * (only for one page if the $pageGroup parameter is provided)
+     * @see CatXmlImportManager
      *
      * @param array $xmlNodes Array with XMLNodes from the CATXML
+     * @param int $pageGroup
      *
-     * @return TranslationData Object with data
-     **/
-    public function getTranslationDataFromCATXMLNodes(&$xmlNodes)
+     * @return \Localizationteam\L10nmgr\Model\TranslationData Object with data
+     */
+    public function getTranslationDataFromCATXMLNodes(&$xmlNodes, $pageGroup = 0)
     {
-        $data = $this->_getParsedCATXMLFromXMLNodes($xmlNodes);
+        $data = $this->_getParsedCATXMLFromXMLNodes($xmlNodes, $pageGroup);
         /** @var TranslationData $translationData */
         $translationData = GeneralUtility::makeInstance(TranslationData::class);
         $translationData->setTranslationData($data);
@@ -59,18 +61,23 @@ class TranslationDataFactory
      * Parses XML String and returns translationData
      *
      * @param array $xmlNodes Array with XMLNodes
+     * @param int $pageGroup
      *
      * @return array with translated information
-     **/
-    protected function _getParsedCATXMLFromXMLNodes(&$xmlNodes)
+     */
+    protected function _getParsedCATXMLFromXMLNodes(&$xmlNodes, $pageGroup = 0)
     {
-        /** @var XmlTools $xmlTool */
+        /** @var \Localizationteam\L10nmgr\Model\Tools\XmlTools $xmlTool */
         $xmlTool = GeneralUtility::makeInstance(XmlTools::class);
-//print_r($xmlNodes); exit;
-        $translation = array();
-// OK, this method of parsing the XML really sucks, but it was 4:04 in the night and ... I have no clue to make it better on PHP4. Anyway, this will work for now. But is probably unstable in case a user puts formatting in the content of the translation! (since only the first CData chunk will be found!)
+        $translation = [];
+
+        // OK, this method of parsing the XML really sucks, but it was 4:04 in the night and ... I have no clue to make it better on PHP4. Anyway, this will work for now. But is probably unstable in case a user puts formatting in the content of the translation! (since only the first CData chunk will be found!)
         if (is_array($xmlNodes['TYPO3L10N'][0]['ch']['pageGrp'])) {
             foreach ($xmlNodes['TYPO3L10N'][0]['ch']['pageGrp'] as $pageGrp) {
+                if ($pageGroup !== 0 && $pageGroup !== (int)$pageGrp['attrs']['id']) {
+                    continue;
+                }
+
                 if (is_array($pageGrp['ch']['data'])) {
                     foreach ($pageGrp['ch']['data'] as $row) {
                         $attrs = $row['attrs'];
@@ -78,66 +85,88 @@ class TranslationDataFactory
                             $translationValue = $xmlTool->XML2RTE($row['XMLvalue']);
                             $translation[$attrs['table']][$attrs['elementUid']][$attrs['key']] = $translationValue;
                         } else {
-//Substitute &amp; with & and <br/> with <br>
-//$row['XMLvalue'] = htmlspecialchars($row['XMLvalue'],ENT_COMPAT|ENT_IGNORE|ENT_XHTML,'UTF-8',false);
-//$row['XMLvalue'] = str_replace('&amp;', '&', $row['XMLvalue']);
-//$row['XMLvalue'] = str_replace('<br/>', '<br>', $row['XMLvalue']);
-//$row['XMLvalue'] = str_replace('<br />', '<br>', $row['XMLvalue']);
-                            $row['values'][0] = preg_replace('/&(?!(amp|nbsp|quot|apos|lt|gt);)/', '&amp;',
-                                $row['values'][0]);
+                            // Substitute &amp; with & and <br/> with <br>
+                            $row['values'][0] =
+                                preg_replace('/&(?!(amp|nbsp|quot|apos|lt|gt);)/', '&amp;', $row['values'][0]);
                             $row['values'][0] = preg_replace('/\xc2\xa0/', '&nbsp;', $row['values'][0]);
-                            $row['values'][0] = htmlspecialchars($row['values'][0], ENT_COMPAT | ENT_IGNORE | ENT_XHTML,
-                                'UTF-8', false);
-//$row['values'][0] = str_replace('<br/>', '<br>', $row['values'][0]);
-//$row['values'][0] = str_replace('<br />', '<br>', $row['values'][0]);
-//check if $row['values'][0] is beginning of $row['XMLvalue']
+                            $row['values'][0] = htmlspecialchars(
+                                $row['values'][0],
+                                ENT_COMPAT | ENT_IGNORE | ENT_XHTML,
+                                'UTF-8',
+                                false
+                            );
+
+                            // check if $row['values'][0] is beginning of $row['XMLvalue']
                             if (TYPO3_DLOG) {
-                                GeneralUtility::sysLog(__FILE__ . ': ' . __LINE__ . ': V0: ' . $row['values'][0],
-                                    'l10nmgr');
-                                GeneralUtility::sysLog(__FILE__ . ': ' . __LINE__ . ': XML: ' . $row['XMLvalue'],
-                                    'l10nmgr');
+                                GeneralUtility::sysLog(
+                                    __FILE__ . ': ' . __LINE__ . ': V0: ' . $row['values'][0],
+                                    'l10nmgr'
+                                );
+                                GeneralUtility::sysLog(
+                                    __FILE__ . ': ' . __LINE__ . ': XML: ' . $row['XMLvalue'],
+                                    'l10nmgr'
+                                );
                             }
                             $pattern = $row['values'][0];
                             if (TYPO3_DLOG) {
-                                GeneralUtility::sysLog(__FILE__ . ': ' . __LINE__ . ': Pattern: ' . $pattern,
-                                    'l10nmgr');
+                                GeneralUtility::sysLog(
+                                    __FILE__ . ': ' . __LINE__ . ': Pattern: ' . $pattern,
+                                    'l10nmgr'
+                                );
                             }
                             $pattern2 = '/' . preg_replace('/\//i', '\/', preg_quote($pattern)) . '/';
                             $pattern = '/^' . preg_replace('/\//i', '\/', preg_quote($pattern)) . '/';
                             $originalValue = htmlspecialchars($row['XMLvalue'], ENT_COMPAT | ENT_IGNORE | ENT_XHTML,
                                 'UTF-8', false);
                             if (TYPO3_DLOG) {
-                                GeneralUtility::sysLog(__FILE__ . ': ' . __LINE__ . ': Pattern: ' . $pattern,
-                                    'l10nmgr');
-                                GeneralUtility::sysLog(__FILE__ . ': ' . __LINE__ . ': Pattern 2: ' . $pattern2,
-                                    'l10nmgr');
+                                GeneralUtility::sysLog(
+                                    __FILE__ . ': ' . __LINE__ . ': Pattern: ' . $pattern,
+                                    'l10nmgr'
+                                );
+                                GeneralUtility::sysLog(
+                                    __FILE__ . ': ' . __LINE__ . ': Pattern 2: ' . $pattern2,
+                                    'l10nmgr'
+                                );
                             }
                             if (preg_match($pattern, $originalValue, $treffer)) {
                                 if (TYPO3_DLOG) {
-                                    GeneralUtility::sysLog(__FILE__ . ': ' . __LINE__ . ': Start row[values][0] eq start row[XMLvalue]!!!' . LF . 'XMLvalue: ' . $row['XMLvalue'],
-                                        'l10nmgr');
+                                    GeneralUtility::sysLog(
+                                        __FILE__ . ': ' . __LINE__ . ': Start row[values][0] eq start row[XMLvalue]!!!'
+                                            . LF . 'XMLvalue: ' . $row['XMLvalue'],
+                                        'l10nmgr'
+                                    );
                                 }
                                 $translation[$attrs['table']][$attrs['elementUid']][$attrs['key']] = $row['XMLvalue'];
                             } elseif ((preg_match('/<[^>]+>/i', $originalValue)) && (!preg_match($pattern2,
                                     $originalValue, $treffer))
                             ) {
                                 if (TYPO3_DLOG) {
-                                    GeneralUtility::sysLog(__FILE__ . ': ' . __LINE__ . ': TAG found in: ' . $row['XMLvalue'],
-                                        'l10nmgr');
-                                    GeneralUtility::sysLog(__FILE__ . ': ' . __LINE__ . ': TAG found: ' . $row['values'][0],
-                                        'l10nmgr');
+                                    GeneralUtility::sysLog(
+                                        __FILE__ . ': ' . __LINE__ . ': TAG found in: ' . $row['XMLvalue'],
+                                        'l10nmgr'
+                                    );
+                                    GeneralUtility::sysLog(
+                                        __FILE__ . ': ' . __LINE__ . ': TAG found: ' . $row['values'][0],
+                                        'l10nmgr'
+                                    );
                                 }
-                                $translation[$attrs['table']][$attrs['elementUid']][$attrs['key']] = $row['values'][0] . $row['XMLvalue'];
+                                $translation[$attrs['table']][$attrs['elementUid']][$attrs['key']] =
+                                    $row['values'][0] . $row['XMLvalue'];
                             } else {
                                 if (TYPO3_DLOG) {
-                                    GeneralUtility::sysLog(__FILE__ . ': ' . __LINE__ . ': No TAG found in: ' . $row['XMLvalue'],
-                                        'l10nmgr');
+                                    GeneralUtility::sysLog(
+                                        __FILE__ . ': ' . __LINE__ . ': No TAG found in: ' . $row['XMLvalue'],
+                                        'l10nmgr'
+                                    );
                                 }
                                 $translation[$attrs['table']][$attrs['elementUid']][$attrs['key']] = $row['XMLvalue'];
                             }
                             if (TYPO3_DLOG) {
-                                GeneralUtility::sysLog(__FILE__ . ': ' . __LINE__ . ': IMPORT: ' . $translation[$attrs['table']][$attrs['elementUid']][$attrs['key']],
-                                    'l10nmgr');
+                                GeneralUtility::sysLog(
+                                    __FILE__ . ': ' . __LINE__ . ': IMPORT: '
+                                        . $translation[$attrs['table']][$attrs['elementUid']][$attrs['key']],
+                                    'l10nmgr'
+                                );
                             }
                         }
                     }
